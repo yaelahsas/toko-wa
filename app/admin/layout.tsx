@@ -29,6 +29,11 @@ const menuItems = [
     icon: Package,
   },
   {
+    title: 'Stok',
+    href: '/admin/products/stock',
+    icon: Package,
+  },
+  {
     title: 'Kategori',
     href: '/admin/categories',
     icon: FolderOpen,
@@ -39,6 +44,7 @@ const menuItems = [
     icon: ShoppingCart,
   },
 ];
+
 
 export default function AdminLayout({
   children,

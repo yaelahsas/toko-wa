@@ -37,12 +37,13 @@ export async function GET(request: NextRequest) {
     // Get low stock products
     try {
       const lowStockResult = await query(
-        'SELECT COUNT(*) as count FROM products WHERE stock <= min_stock'
+        'SELECT COUNT(*) as count FROM products WHERE stock < min_stock'
       );
       stats.lowStockProducts = parseInt(lowStockResult.rows[0].count);
     } catch (error) {
       console.error('Error fetching low stock products:', error);
     }
+
 
     // Get total orders
     try {
