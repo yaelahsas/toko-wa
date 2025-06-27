@@ -23,6 +23,8 @@ import { useWishlist } from '@/hooks/use-wishlist';
 import { Carousel } from '@/components/ui/carousel';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { toast } from 'sonner';
+import { ProductGridSkeleton } from '@/components/product-skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface VoucherStoreProps {
   initialProducts: Product[];
@@ -117,16 +119,36 @@ export default function VoucherStore({
 
   const addToCart = (productId: string) => {
     const product = products.find((p) => p.id.toString() === productId);
+    
+    if (!product) return;
+    
+    // Check stock availability for physical products
+    if (product.type === 'physical') {
+      const currentInCart = cart[productId] || 0;
+      
+      if (product.stock === 0) {
+        toast.error('Stok habis', {
+          description: `${product.name} tidak tersedia`,
+        });
+        return;
+      }
+      
+      if (currentInCart >= product.stock) {
+        toast.error('Stok tidak cukup', {
+          description: `Maksimal ${product.stock} item untuk ${product.name}`,
+        });
+        return;
+      }
+    }
+    
     setCart((prev) => ({
       ...prev,
       [productId]: (prev[productId] || 0) + 1,
     }));
     
-    if (product) {
-      toast.success(`${product.name} ditambahkan ke keranjang`, {
-        description: `Total: ${cart[productId] ? cart[productId] + 1 : 1} item`,
-      });
-    }
+    toast.success(`${product.name} ditambahkan ke keranjang`, {
+      description: `Total: ${cart[productId] ? cart[productId] + 1 : 1} item`,
+    });
   };
 
   const removeFromCart = (productId: string) => {
@@ -419,6 +441,26 @@ export default function VoucherStore({
                     <p className="text-xs text-gray-600 mb-2 line-clamp-2">
                       {product.description}
                     </p>
+                    
+                    {/* Stock Status */}
+                    {product.type === 'physical' && (
+                      <div className="mb-2">
+                        {product.stock_status === 'out_of_stock' ? (
+                          <Badge variant="destructive" className="text-xs">
+                            Stok Habis
+                          </Badge>
+                        ) : product.stock_status === 'low_stock' ? (
+                          <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">
+                            Stok Terbatas ({product.stock})
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                            Stok: {product.stock}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <div className="font-bold text-emerald-700">
@@ -449,6 +491,7 @@ export default function VoucherStore({
                           size="sm"
                           onClick={() => addToCart(productId)}
                           className="w-8 h-8 p-0"
+                          disabled={product.type === 'physical' && product.stock === 0}
                         >
                           <Plus className="w-4 h-4" />
                         </Button>

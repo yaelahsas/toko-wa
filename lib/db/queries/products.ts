@@ -9,6 +9,7 @@ export interface Product {
   price: number;
   original_price?: number;
   stock: number;
+  min_stock?: number;
   type: 'physical' | 'voucher';
   is_active: boolean;
   created_at: Date;
@@ -20,6 +21,7 @@ export interface Product {
     url: string;
     is_primary: boolean;
   }>;
+  stock_status?: 'in_stock' | 'low_stock' | 'out_of_stock';
 }
 
 export async function getProducts(
@@ -33,6 +35,11 @@ export async function getProducts(
       p.*,
       c.name as category_name,
       c.slug as category_slug,
+      CASE 
+        WHEN p.stock = 0 THEN 'out_of_stock'
+        WHEN p.stock <= COALESCE(p.min_stock, 5) THEN 'low_stock'
+        ELSE 'in_stock'
+      END as stock_status,
       COALESCE(
         json_agg(
           json_build_object(
@@ -171,4 +178,78 @@ export async function getProductCount(category?: string): Promise<number> {
   
   const result = await query(sql, params);
   return parseInt(result.rows[0].count);
+}
+
+// Stock management functions
+export async function updateProductStock(
+  productId: number, 
+  quantity: number,
+  operation: 'add' | 'subtract' | 'set'
+): Promise<boolean> {
+  let sql = '';
+  
+  switch (operation) {
+    case 'add':
+      sql = 'UPDATE products SET stock = stock + $2 WHERE id = $1';
+      break;
+    case 'subtract':
+      sql = 'UPDATE products SET stock = GREATEST(0, stock - $2) WHERE id = $1';
+      break;
+    case 'set':
+      sql = 'UPDATE products SET stock = $2 WHERE id = $1';
+      break;
+  }
+  
+  const result = await query(sql, [productId, quantity]);
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function getLowStockProducts(): Promise<Product[]> {
+  const sql = `
+    SELECT 
+      p.*,
+      c.name as category_name,
+      c.slug as category_slug,
+      CASE 
+        WHEN p.stock = 0 THEN 'out_of_stock'
+        WHEN p.stock <= COALESCE(p.min_stock, 5) THEN 'low_stock'
+        ELSE 'in_stock'
+      END as stock_status
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    WHERE p.is_active = true
+    AND (p.stock = 0 OR p.stock <= COALESCE(p.min_stock, 5))
+    ORDER BY p.stock ASC, p.name ASC
+  `;
+  
+  const result = await query(sql);
+  return result.rows;
+}
+
+export async function checkProductAvailability(
+  productId: number, 
+  requestedQuantity: number
+): Promise<{ available: boolean; currentStock: number; message?: string }> {
+  const sql = 'SELECT stock, name FROM products WHERE id = $1 AND is_active = true';
+  const result = await query(sql, [productId]);
+  
+  if (result.rows.length === 0) {
+    return { available: false, currentStock: 0, message: 'Produk tidak ditemukan' };
+  }
+  
+  const product = result.rows[0];
+  
+  if (product.stock === 0) {
+    return { available: false, currentStock: 0, message: 'Stok habis' };
+  }
+  
+  if (product.stock < requestedQuantity) {
+    return { 
+      available: false, 
+      currentStock: product.stock, 
+      message: `Stok tidak cukup. Tersisa ${product.stock} item` 
+    };
+  }
+  
+  return { available: true, currentStock: product.stock };
 }
