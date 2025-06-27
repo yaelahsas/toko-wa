@@ -4,22 +4,26 @@ import * as React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 interface CarouselProps {
   images: string[];
   className?: string;
+  alt?: string;
 }
 
-export function Carousel({ images, className }: CarouselProps) {
+export function Carousel({ images, className, alt = 'Product image' }: CarouselProps) {
   const [currentIndex, setCurrentIndex] = React.useState(0);
 
-  const goToPrevious = () => {
+  const goToPrevious = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setCurrentIndex((prevIndex) =>
       prevIndex === 0 ? images.length - 1 : prevIndex - 1
     );
   };
 
-  const goToNext = () => {
+  const goToNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setCurrentIndex((prevIndex) =>
       prevIndex === images.length - 1 ? 0 : prevIndex + 1
     );
@@ -30,26 +34,48 @@ export function Carousel({ images, className }: CarouselProps) {
   };
 
   if (images.length === 0) {
-    return null;
+    return (
+      <div className={cn('relative', className)}>
+        <Image
+          src="/placeholder.svg"
+          alt="No image available"
+          width={300}
+          height={200}
+          className="w-full h-full object-cover"
+          priority
+        />
+      </div>
+    );
   }
 
   if (images.length === 1) {
     return (
-      <img
-        src={images[0]}
-        alt="Product"
-        className={cn('w-full object-cover', className)}
-      />
+      <div className={cn('relative', className)}>
+        <Image
+          src={images[0]}
+          alt={alt}
+          width={300}
+          height={200}
+          className="w-full h-full object-cover"
+          priority
+        />
+      </div>
     );
   }
 
   return (
     <div className="relative group">
-      <img
-        src={images[currentIndex]}
-        alt={`Product ${currentIndex + 1}`}
-        className={cn('w-full object-cover', className)}
-      />
+      <div className={cn('relative', className)}>
+        <Image
+          src={images[currentIndex]}
+          alt={`${alt} ${currentIndex + 1}`}
+          width={300}
+          height={200}
+          className="w-full h-full object-cover"
+          priority={currentIndex === 0}
+          loading={currentIndex === 0 ? 'eager' : 'lazy'}
+        />
+      </div>
 
       {/* Navigation Buttons */}
       <Button
@@ -57,6 +83,7 @@ export function Carousel({ images, className }: CarouselProps) {
         size="sm"
         onClick={goToPrevious}
         className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 p-0 bg-black/50 hover:bg-black/70 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+        aria-label="Previous image"
       >
         <ChevronLeft className="w-4 h-4" />
       </Button>
@@ -65,6 +92,7 @@ export function Carousel({ images, className }: CarouselProps) {
         size="sm"
         onClick={goToNext}
         className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 p-0 bg-black/50 hover:bg-black/70 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+        aria-label="Next image"
       >
         <ChevronRight className="w-4 h-4" />
       </Button>
@@ -74,13 +102,17 @@ export function Carousel({ images, className }: CarouselProps) {
         {images.map((_, index) => (
           <button
             key={index}
-            onClick={() => goToSlide(index)}
+            onClick={(e) => {
+              e.stopPropagation();
+              goToSlide(index);
+            }}
             className={cn(
               'w-1.5 h-1.5 rounded-full transition-all',
               index === currentIndex
                 ? 'bg-white w-3'
                 : 'bg-white/50 hover:bg-white/75'
             )}
+            aria-label={`Go to image ${index + 1}`}
           />
         ))}
       </div>
