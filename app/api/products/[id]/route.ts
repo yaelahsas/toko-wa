@@ -1,97 +1,162 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getProductById, getProductBySlug } from '@/lib/db/queries/products';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { query } from '@/lib/db/connection';
 
-export async function GET(
+// DELETE product
+export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
-    
-    // Check if id is numeric (ID) or string (slug)
-    const isNumeric = /^\d+$/.test(id);
-    
-    const product = isNumeric 
-      ? await getProductById(parseInt(id))
-      : await getProductBySlug(id);
-    
-    if (!product) {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== 'admin') {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Product not found' 
-        },
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const productId = parseInt(params.id);
+
+    // Check if product exists
+    const checkResult = await query(
+      'SELECT id FROM products WHERE id = $1',
+      [productId]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Product not found' },
         { status: 404 }
       );
     }
-    
-    return NextResponse.json({
-      success: true,
-      data: product
-    });
+
+    // Delete product
+    await query('DELETE FROM products WHERE id = $1', [productId]);
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('Delete product error:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Failed to delete product' },
       { status: 500 }
     );
   }
 }
 
+// GET single product
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const productId = parseInt(params.id);
+
+    const result = await query(
+      `SELECT 
+        p.*,
+        c.name as category_name,
+        c.slug as category_slug
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.id = $1`,
+      [productId]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Product not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(result.rows[0]);
+  } catch (error) {
+    console.error('Get product error:', error);
+    return NextResponse.json(
+      { error: 'Failed to get product' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT update product
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
-    const body = await request.json();
-    
-    // Here you would update the product
-    // const updatedProduct = await updateProduct(parseInt(id), body);
-    
-    return NextResponse.json({
-      success: true,
-      message: 'Product update endpoint (not implemented yet)'
-    });
-  } catch (error) {
-    console.error('API Error:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
-  }
-}
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    
-    // Here you would delete the product
-    // await deleteProduct(parseInt(id));
-    
-    return NextResponse.json({
-      success: true,
-      message: 'Product delete endpoint (not implemented yet)'
-    });
+    const productId = parseInt(params.id);
+    const body = await request.json();
+
+    const {
+      name,
+      type,
+      price,
+      original_price,
+      description,
+      image,
+      category_id,
+      stock,
+      min_stock,
+      is_active
+    } = body;
+
+    // Update product
+    const result = await query(
+      `UPDATE products 
+      SET 
+        name = $1,
+        type = $2,
+        price = $3,
+        original_price = $4,
+        description = $5,
+        image = $6,
+        category_id = $7,
+        stock = $8,
+        min_stock = $9,
+        is_active = $10,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $11
+      RETURNING *`,
+      [
+        name,
+        type,
+        price,
+        original_price,
+        description,
+        image,
+        category_id,
+        stock,
+        min_stock,
+        is_active,
+        productId
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Product not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(result.rows[0]);
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('Update product error:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Failed to update product' },
       { status: 500 }
     );
   }
