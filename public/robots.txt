@@ -1,0 +1,23 @@
+# Robots.txt for Toko Sembako Sri Rejeki Utama
+# Allow all web crawlers
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /confirmation
+
+# Sitemap location
+Sitemap: https://yourdomain.com/sitemap.xml
+
+# Crawl-delay for responsible crawling
+Crawl-delay: 1
+
+# Google specific
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+# Bing specific
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
