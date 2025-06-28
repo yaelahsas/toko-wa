@@ -13,8 +13,10 @@ import {
   Menu,
   X,
   User,
+  Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Toaster } from '@/components/ui/toaster';
 import { useState } from 'react';
 
 const menuItems = [
@@ -47,6 +49,11 @@ const menuItems = [
     title: 'Pelanggan',
     href: '/admin/customers',
     icon: User,
+  },
+  {
+    title: 'Pengaturan',
+    href: '/admin/settings',
+    icon: Settings,
   },
 ];
 
@@ -204,6 +211,7 @@ export default function AdminLayout({
           {children}
         </main>
       </div>
+      <Toaster />
     </div>
   );
 }

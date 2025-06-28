@@ -33,6 +33,7 @@ interface VoucherStoreProps {
     name: string;
     tagline: string;
     whatsappNumber: string;
+    logo?: string | null;
     minPurchase: number;
   };
   voucherInfo: {
@@ -232,7 +233,15 @@ export default function VoucherStore({
           <div className="flex items-center justify-between mb-4">
             <div className="text-center flex-1">
               <div className="flex items-center justify-center gap-2 mb-1">
-                <ShoppingBag className="w-6 h-6 text-yellow-200 dark:text-yellow-400" />
+                {storeInfo.logo ? (
+                  <img 
+                    src={storeInfo.logo} 
+                    alt="Logo Toko" 
+                    className="w-8 h-8 object-contain rounded"
+                  />
+                ) : (
+                  <ShoppingBag className="w-6 h-6 text-yellow-200 dark:text-yellow-400" />
+                )}
                 <h1 className="text-xl font-bold text-white">{storeInfo.name}</h1>
               </div>
               <p className="text-white/90 text-sm">{storeInfo.tagline}</p>

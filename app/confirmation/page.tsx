@@ -20,6 +20,14 @@ import { useRouter } from 'next/navigation';
 import storeConfig from '../../data/store-config.json';
 import { Product } from '@/lib/db/queries/products';
 
+interface StoreInfo {
+  name: string;
+  tagline: string;
+  whatsappNumber: string;
+  logo: string | null;
+  minPurchase: number;
+}
+
 export default function ConfirmationPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -34,9 +42,34 @@ export default function ConfirmationPage() {
   const [promoMessage, setPromoMessage] = useState('');
   const [promoId, setPromoId] = useState<number | null>(null);
   const [isValidatingPromo, setIsValidatingPromo] = useState(false);
+  const [storeInfo, setStoreInfo] = useState<StoreInfo>({
+    name: storeConfig.storeInfo.name,
+    tagline: storeConfig.storeInfo.tagline,
+    whatsappNumber: storeConfig.storeInfo.whatsappNumber,
+    logo: null,
+    minPurchase: storeConfig.storeInfo.minPurchase
+  });
 
-  const { storeInfo, formLabels, messages } = storeConfig;
+  const { formLabels, messages } = storeConfig;
   const minPurchase = storeInfo.minPurchase;
+
+  // Fetch store settings
+  useEffect(() => {
+    const fetchStoreSettings = async () => {
+      try {
+        const response = await fetch('/api/store/settings');
+        if (response.ok) {
+          const data = await response.json();
+          setStoreInfo(data.storeInfo);
+        }
+      } catch (error) {
+        console.error('Error fetching store settings:', error);
+        // Keep fallback values from storeConfig
+      }
+    };
+
+    fetchStoreSettings();
+  }, []);
 
   // Load cart from localStorage and fetch products from database
   useEffect(() => {

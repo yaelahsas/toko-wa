@@ -19,9 +19,28 @@ async function getInitialData() {
   }
 }
 
+async function getStoreSettings() {
+  try {
+    const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/store/settings`, {
+      cache: 'no-store' // Always fetch fresh data
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data.storeInfo;
+    }
+  } catch (error) {
+    console.error('Error fetching store settings:', error);
+  }
+  
+  // Fallback to static config
+  return storeConfig.storeInfo;
+}
+
 export default async function Page() {
   const { products, categories } = await getInitialData();
-  const { storeInfo, voucherInfo, messages } = storeConfig;
+  const storeInfo = await getStoreSettings();
+  const { voucherInfo, messages } = storeConfig;
 
   // Parse images property if it's a string
   const parsedProducts = products.map(product => {
