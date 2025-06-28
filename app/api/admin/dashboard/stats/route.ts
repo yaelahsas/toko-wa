@@ -1,99 +1,44 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { query } from '@/lib/db/connection';
+import { NextResponse } from 'next/server'
+import { query } from '@/lib/db/connection'
+import { getOrderStatistics } from '@/lib/db/queries/orders'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // Check authentication
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    // Get product stats
+    const productStats = await query(`
+      SELECT 
+        COUNT(*) as total_products,
+        COUNT(CASE WHEN stock <= 5 AND type = 'physical' THEN 1 END) as low_stock_products
+      FROM products
+      WHERE is_active = true
+    `)
 
-    // Initialize stats with default values
-    let stats = {
-      totalProducts: 0,
-      lowStockProducts: 0,
-      totalOrders: 0,
-      pendingOrders: 0,
-      totalRevenue: 0,
-      todayRevenue: 0,
-    };
-
-    // Get total products
-    try {
-      const totalProductsResult = await query(
-        'SELECT COUNT(*) as count FROM products'
-      );
-      stats.totalProducts = parseInt(totalProductsResult.rows[0].count);
-    } catch (error) {
-      console.error('Error fetching total products:', error);
-    }
-
-    // Get low stock products
-    try {
-      const lowStockResult = await query(
-        'SELECT COUNT(*) as count FROM products WHERE stock < min_stock'
-      );
-      stats.lowStockProducts = parseInt(lowStockResult.rows[0].count);
-    } catch (error) {
-      console.error('Error fetching low stock products:', error);
-    }
-
-
-    // Get total orders
-    try {
-      const totalOrdersResult = await query(
-        'SELECT COUNT(*) as count FROM orders'
-      );
-      stats.totalOrders = parseInt(totalOrdersResult.rows[0].count);
-    } catch (error) {
-      console.error('Error fetching total orders:', error);
-    }
-
-    // Get pending orders
-    try {
-      const pendingOrdersResult = await query(
-        "SELECT COUNT(*) as count FROM orders WHERE status = 'pending'"
-      );
-      stats.pendingOrders = parseInt(pendingOrdersResult.rows[0].count);
-    } catch (error) {
-      console.error('Error fetching pending orders:', error);
-    }
-
-    // Get total revenue
-    try {
-      const totalRevenueResult = await query(
-        'SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE status != \'cancelled\''
-      );
-      stats.totalRevenue = parseFloat(totalRevenueResult.rows[0].total);
-    } catch (error) {
-      console.error('Error fetching total revenue:', error);
-    }
+    // Get order stats
+    const orderStats = await getOrderStatistics()
 
     // Get today's revenue
-    try {
-      const todayRevenueResult = await query(
-        `SELECT COALESCE(SUM(total_amount), 0) as total 
-         FROM orders 
-         WHERE status != 'cancelled' 
-         AND DATE(created_at) = CURRENT_DATE`
-      );
-      stats.todayRevenue = parseFloat(todayRevenueResult.rows[0].total);
-    } catch (error) {
-      console.error('Error fetching today revenue:', error);
+    const todayRevenue = await query(`
+      SELECT COALESCE(SUM(total_amount), 0) as today_revenue
+      FROM orders
+      WHERE DATE(created_at) = CURRENT_DATE
+      AND status != 'cancelled'
+    `)
+
+    const stats = {
+      totalProducts: parseInt(productStats.rows[0].total_products),
+      lowStockProducts: parseInt(productStats.rows[0].low_stock_products),
+      totalOrders: parseInt(orderStats.total_orders),
+      pendingOrders: parseInt(orderStats.pending_orders),
+      totalRevenue: parseFloat(orderStats.total_revenue) || 0,
+      todayRevenue: parseFloat(todayRevenue.rows[0].today_revenue) || 0
     }
 
-    return NextResponse.json(stats);
+    return NextResponse.json(stats)
   } catch (error) {
-    console.error('Dashboard stats error:', error);
+    console.error('Error fetching dashboard stats:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to fetch dashboard stats' },
       { status: 500 }
-    );
+    )
   }
 }
