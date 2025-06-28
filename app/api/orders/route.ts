@@ -74,10 +74,12 @@ export async function POST(request: NextRequest) {
       if (body.promo_code) {
         const promoResult = await client.query(
           `SELECT * FROM promo_codes 
-           WHERE code = $1 AND is_active = true 
-           AND (expires_at IS NULL OR expires_at > NOW())
-           AND (usage_limit IS NULL OR usage_count < usage_limit)`,
-          [body.promo_code]
+           WHERE UPPER(code) = UPPER($1) AND is_active = true 
+           AND (valid_until IS NULL OR valid_until > NOW())
+           AND valid_from <= NOW()
+           AND (usage_limit IS NULL OR usage_count < usage_limit)
+           AND min_purchase <= $2`,
+          [body.promo_code, subtotal]
         )
 
         if (promoResult.rows.length > 0) {
@@ -92,12 +94,18 @@ export async function POST(request: NextRequest) {
             discountAmount = promo.discount_value
           }
 
+          // Make sure discount doesn't exceed total amount
+          if (discountAmount > subtotal) {
+            discountAmount = subtotal
+          }
+
           // Update promo usage
           await client.query(
-            'UPDATE promo_codes SET usage_count = usage_count + 1 WHERE id = $1',
+            'UPDATE promo_codes SET usage_count = usage_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
             [promo.id]
           )
         }
+
       }
 
       const totalAmount = subtotal - discountAmount

@@ -195,7 +195,7 @@ export default function ConfirmationPage() {
     setPromoId(null);
   };
 
-  const sendToWhatsApp = () => {
+  const sendToWhatsApp = async () => {
     if (!name || !email || !phone) {
       alert('Mohon lengkapi semua data yang diperlukan');
       return;
@@ -220,41 +220,77 @@ export default function ConfirmationPage() {
       return;
     }
 
-    const orderDetails = Object.entries(cart)
-      .map(([id, qty]) => {
-        const product = products.find((p) => p.id.toString() === id);
-        return `${product?.name} x${qty} = ${formatPrice(
-          (product?.price || 0) * qty
-        )}`;
-      })
-      .join('\n');
+    try {
+      // Create order in database first
+      const orderItems = Object.entries(cart).map(([productId, quantity]) => ({
+        product_id: parseInt(productId),
+        quantity,
+      }));
 
-    // Build message with promo info if applicable
-    let messageText = messages.orderMessage
-      .replace('{orderDetails}', orderDetails);
-    
-    // Add promo code info if discount is applied
-    if (promoDiscount > 0) {
-      const promoInfo = `\n\nSubtotal: ${formatPrice(subtotal)}\nKode Promo (${promoCode}): -${formatPrice(promoDiscount)}\n`;
-      messageText = messageText.replace('{total}', `${promoInfo}*Total: ${formatPrice(totalPrice)}*`);
-    } else {
-      messageText = messageText.replace('{total}', formatPrice(totalPrice));
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customer_name: name.trim(),
+          customer_phone: phone.trim(),
+          customer_email: email.trim(),
+          promo_code: promoCode.trim() || undefined,
+          items: orderItems,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        alert(`Gagal membuat pesanan: ${result.error || 'Unknown error'}`);
+        return;
+      }
+
+      // Order created successfully, now send WhatsApp message
+      const orderDetails = Object.entries(cart)
+        .map(([id, qty]) => {
+          const product = products.find((p) => p.id.toString() === id);
+          return `${product?.name} x${qty} = ${formatPrice(
+            (product?.price || 0) * qty
+          )}`;
+        })
+        .join('\n');
+
+      // Build message with promo info if applicable
+      let messageText = messages.orderMessage
+        .replace('{orderDetails}', orderDetails);
+      
+      // Add promo code info if discount is applied
+      if (promoDiscount > 0) {
+        const promoInfo = `\n\nSubtotal: ${formatPrice(subtotal)}\nKode Promo (${promoCode}): -${formatPrice(promoDiscount)}\n`;
+        messageText = messageText.replace('{total}', `${promoInfo}*Total: ${formatPrice(totalPrice)}*`);
+      } else {
+        messageText = messageText.replace('{total}', formatPrice(totalPrice));
+      }
+      
+      const message = messageText
+        .replace('{name}', name)
+        .replace('{email}', email)
+        .replace('{phone}', phone);
+
+      const whatsappUrl = `https://wa.me/${
+        storeInfo.whatsappNumber
+      }?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+
+      // Clear cart after successful order
+      localStorage.removeItem('cart');
+      setCart({});
+      
+      alert('Pesanan berhasil dibuat! Stok telah dikurangi.');
+    } catch (error) {
+      console.error('Error creating order:', error);
+      alert('Terjadi kesalahan saat membuat pesanan. Silakan coba lagi.');
     }
-    
-    const message = messageText
-      .replace('{name}', name)
-      .replace('{email}', email)
-      .replace('{phone}', phone);
-
-    const whatsappUrl = `https://wa.me/${
-      storeInfo.whatsappNumber
-    }?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
-
-    // Clear cart after successful order
-    localStorage.removeItem('cart');
-    setCart({});
   };
+
 
   const goBack = () => {
     router.push('/');

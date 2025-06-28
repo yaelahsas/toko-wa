@@ -135,13 +135,15 @@ export async function getOrderById(id: number): Promise<OrderWithItems | null> {
   const itemsResult = await query(
     `SELECT 
       oi.*,
-      p.image_url as product_image,
+      pi.image_url as product_image,
       p.type as product_type
     FROM order_items oi
     LEFT JOIN products p ON oi.product_id = p.id
+    LEFT JOIN product_images pi ON p.id = pi.product_id AND pi.is_primary = true
     WHERE order_id = $1`,
     [id]
   )
+
 
   return {
     ...order,

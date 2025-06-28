@@ -59,6 +59,7 @@ export default function VoucherStore({
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [products] = useState(initialProducts);
+
   const router = useRouter();
   const { wishlist, toggleWishlist, isInWishlist } = useWishlist();
 
@@ -200,6 +201,11 @@ export default function VoucherStore({
     }, 1000);
   };
 
+
+
+
+
+
   const clearSearch = () => {
     setSearchQuery('');
   };
@@ -215,6 +221,8 @@ export default function VoucherStore({
       </div>
     );
   }
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-600 via-green-500 to-emerald-500 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -256,6 +264,7 @@ export default function VoucherStore({
         </div>
       </div>
 
+
       {/* Floating Cart Counter */}
       <div className="fixed top-32 right-4 z-40">
         <Card className="bg-white/95 backdrop-blur-sm border-white/40 shadow-lg">
@@ -270,6 +279,7 @@ export default function VoucherStore({
           </CardContent>
         </Card>
       </div>
+
 
       {/* Main Content with padding for sticky elements */}
       <div className="container mx-auto px-4 py-6 max-w-md pb-40">
@@ -554,6 +564,8 @@ export default function VoucherStore({
           </Button>
         </div>
       </div>
+
+
     </div>
   );
 }
