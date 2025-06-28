@@ -44,7 +44,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const [fetching, setFetching] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [imagePreview, setImagePreview] = useState<string>('');
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [productId, setProductId] = useState<string>('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -55,7 +55,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     price: '',
     original_price: '',
     description: '',
-    image: '/placeholder.svg',
+    images: [] as { url: string; is_primary: boolean; display_order?: number }[],
     category_id: '',
     stock: '',
     min_stock: '5',
@@ -120,13 +120,13 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           price: product.price.toString(),
           original_price: product.original_price?.toString() || '',
           description: product.description || '',
-          image: product.image || '/placeholder.svg',
+          images: product.images || [],
           category_id: product.category_id?.toString() || '',
           stock: product.stock.toString(),
           min_stock: product.min_stock.toString(),
           is_active: product.is_active,
         });
-        setImagePreview(product.image || '');
+        setImagePreviews(product.images?.map((img: any) => img.url) || []);
       } else {
         toast({
           title: "Error",
@@ -247,8 +247,12 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
 
       if (response.ok) {
         const data = await response.json();
-        setFormData(prev => ({ ...prev, image: data.url }));
-        setImagePreview(data.url);
+        // Add new image to images array
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, { url: data.url, is_primary: prev.images.length === 0, display_order: prev.images.length }]
+        }));
+        setImagePreviews(prev => [...prev, data.url]);
         setHasUnsavedChanges(true);
         toast({
           title: "Success",
@@ -274,9 +278,12 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  const handleRemoveImage = () => {
-    setFormData(prev => ({ ...prev, image: '/placeholder.svg' }));
-    setImagePreview('');
+  const handleRemoveImage = (urlToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter(img => img.url !== urlToRemove)
+    }));
+    setImagePreviews(prev => prev.filter(url => url !== urlToRemove));
     setHasUnsavedChanges(true);
   };
 
@@ -313,6 +320,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           category_id: formData.category_id ? parseInt(formData.category_id) : null,
           stock: parseInt(formData.stock),
           min_stock: parseInt(formData.min_stock),
+          images: formData.images, // ensure images array is sent
         }),
       });
 
@@ -495,23 +503,35 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                   Product Image
                 </label>
                 <div className="space-y-2">
-                  {(imagePreview || formData.image !== '/placeholder.svg') && (
+                  {imagePreviews.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {imagePreviews.map((url) => (
+                        <div key={url} className="relative inline-block">
+                          <img
+                            src={url}
+                            alt="Preview"
+                            className="w-32 h-32 object-cover rounded-lg border"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/placeholder.svg';
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(url)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
                     <div className="relative inline-block">
                       <img
-                        src={imagePreview || formData.image}
+                        src="/placeholder.svg"
                         alt="Preview"
                         className="w-32 h-32 object-cover rounded-lg border"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/placeholder.svg';
-                        }}
                       />
-                      <button
-                        type="button"
-                        onClick={handleRemoveImage}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
                     </div>
                   )}
                   

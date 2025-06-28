@@ -77,7 +77,17 @@ export async function getProducts(
   params.push(limit, offset);
 
   const result = await query(sql, params);
-  return result.rows;
+
+  // Add image property as primary image url for convenience
+  const productsWithImage = result.rows.map((product: any) => {
+    const primaryImage = product.images.find((img: any) => img.is_primary);
+    return {
+      ...product,
+      image: primaryImage ? primaryImage.url : '/placeholder.svg',
+    };
+  });
+
+  return productsWithImage;
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {

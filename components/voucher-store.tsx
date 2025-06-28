@@ -398,7 +398,15 @@ export default function VoucherStore({
                       if (!a.is_primary && b.is_primary) return 1;
                       return 0;
                     })
-                    .map(img => img.url)
+                    .map(img => {
+                     
+                      // Trim URL and prefix with /uploads/ if not an absolute URL or starting with /
+                      const trimmedUrl = img.url.trim();
+                      if (trimmedUrl.startsWith('http') || trimmedUrl.startsWith('/uploads/')) {
+                        return trimmedUrl;
+                      }
+                      return `/uploads/${trimmedUrl}`;
+                    })
                 : ['/placeholder.svg'];
 
               return (

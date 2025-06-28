@@ -66,15 +66,16 @@ export function Carousel({ images, className, alt = 'Product image' }: CarouselP
   return (
     <div className="relative group">
       <div className={cn('relative', className)}>
-        <Image
-          src={images[currentIndex]}
-          alt={`${alt} ${currentIndex + 1}`}
-          width={300}
-          height={200}
-          className="w-full h-full object-cover"
-          priority={currentIndex === 0}
-          loading={currentIndex === 0 ? 'eager' : 'lazy'}
-        />
+          <Image
+            src={images[currentIndex]}
+            alt={`${alt} ${currentIndex + 1}`}
+            width={300}
+            height={200}
+            className="w-full h-full object-cover"
+            priority={currentIndex === 0}
+            loading={currentIndex === 0 ? 'eager' : 'lazy'}
+            unoptimized
+          />
       </div>
 
       {/* Navigation Buttons */}
@@ -82,7 +83,7 @@ export function Carousel({ images, className, alt = 'Product image' }: CarouselP
         variant="ghost"
         size="sm"
         onClick={goToPrevious}
-        className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 p-0 bg-black/50 hover:bg-black/70 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 p-0 bg-black/50 hover:bg-black/70 text-white rounded-full transition-opacity"
         aria-label="Previous image"
       >
         <ChevronLeft className="w-4 h-4" />
@@ -91,7 +92,7 @@ export function Carousel({ images, className, alt = 'Product image' }: CarouselP
         variant="ghost"
         size="sm"
         onClick={goToNext}
-        className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 p-0 bg-black/50 hover:bg-black/70 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 p-0 bg-black/50 hover:bg-black/70 text-white rounded-full transition-opacity"
         aria-label="Next image"
       >
         <ChevronRight className="w-4 h-4" />

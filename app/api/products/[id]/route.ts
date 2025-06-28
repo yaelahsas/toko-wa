@@ -54,7 +54,8 @@ export async function GET(
   try {
     const productId = parseInt(params.id);
 
-    const result = await query(
+    // Get product data
+    const productResult = await query(
       `SELECT 
         p.*,
         c.name as category_name,
@@ -65,14 +66,27 @@ export async function GET(
       [productId]
     );
 
-    if (result.rows.length === 0) {
+    if (productResult.rows.length === 0) {
       return NextResponse.json(
         { error: 'Product not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(result.rows[0]);
+    const product = productResult.rows[0];
+
+    // Get product images
+    const imagesResult = await query(
+      `SELECT id, image_url as url, is_primary, display_order
+       FROM product_images
+       WHERE product_id = $1
+       ORDER BY display_order ASC`,
+      [productId]
+    );
+
+    product.images = imagesResult.rows;
+
+    return NextResponse.json({ success: true, data: product });
   } catch (error) {
     console.error('Get product error:', error);
     return NextResponse.json(
@@ -106,7 +120,7 @@ export async function PUT(
       price,
       original_price,
       description,
-      image,
+      images, // changed from image to images array
       category_id,
       stock,
       min_stock,
@@ -122,13 +136,12 @@ export async function PUT(
         price = $3,
         original_price = $4,
         description = $5,
-        image = $6,
-        category_id = $7,
-        stock = $8,
-        min_stock = $9,
-        is_active = $10,
+        category_id = $6,
+        stock = $7,
+        min_stock = $8,
+        is_active = $9,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $11
+      WHERE id = $10
       RETURNING *`,
       [
         name,
@@ -136,7 +149,6 @@ export async function PUT(
         price,
         original_price,
         description,
-        image,
         category_id,
         stock,
         min_stock,
@@ -152,7 +164,29 @@ export async function PUT(
       );
     }
 
-    return NextResponse.json(result.rows[0]);
+    const product = result.rows[0];
+
+    // Delete existing images for product
+    await query('DELETE FROM product_images WHERE product_id = $1', [productId]);
+
+    // Insert new images into product_images table if images array is provided
+    if (Array.isArray(images) && images.length > 0) {
+      const insertImagePromises = images.map((img: { url: string; is_primary: boolean; display_order?: number }) => {
+        return query(
+          `INSERT INTO product_images (product_id, image_url, is_primary, display_order)
+           VALUES ($1, $2, $3, $4)`,
+          [
+            productId,
+            img.url,
+            img.is_primary,
+            img.display_order || 0
+          ]
+        );
+      });
+      await Promise.all(insertImagePromises);
+    }
+
+    return NextResponse.json(product);
   } catch (error) {
     console.error('Update product error:', error);
     return NextResponse.json(

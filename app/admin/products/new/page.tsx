@@ -19,19 +19,21 @@ export default function NewProductPage() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [imagePreview, setImagePreview] = useState<string>('');
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     type: 'physical',
     price: '',
     original_price: '',
     description: '',
-    image: '/placeholder.svg',
+    images: [] as { url: string; is_primary: boolean; display_order?: number }[],
     category_id: '',
     stock: '',
     min_stock: '5',
     is_active: true,
   });
+
+  // Remove any usage of imagePreview variable which is undefined
 
   useEffect(() => {
     fetchCategories();
@@ -78,8 +80,12 @@ export default function NewProductPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setFormData(prev => ({ ...prev, image: data.url }));
-        setImagePreview(data.url);
+        // Add new image to images array
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, { url: data.url, is_primary: prev.images.length === 0, display_order: prev.images.length }]
+        }));
+        setImagePreviews(prev => [...prev, data.url]);
       } else {
         const error = await response.json();
         alert(error.error || 'Gagal upload gambar');
@@ -92,9 +98,12 @@ export default function NewProductPage() {
     }
   };
 
-  const handleRemoveImage = () => {
-    setFormData(prev => ({ ...prev, image: '/placeholder.svg' }));
-    setImagePreview('');
+  const handleRemoveImage = (urlToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter(img => img.url !== urlToRemove)
+    }));
+    setImagePreviews(prev => prev.filter(url => url !== urlToRemove));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -114,6 +123,7 @@ export default function NewProductPage() {
           category_id: formData.category_id ? parseInt(formData.category_id) : null,
           stock: parseInt(formData.stock),
           min_stock: parseInt(formData.min_stock),
+          images: formData.images, // ensure images array is sent
         }),
       });
 
@@ -231,20 +241,35 @@ export default function NewProductPage() {
                   Gambar Produk
                 </label>
                 <div className="space-y-2">
-                  {(imagePreview || formData.image !== '/placeholder.svg') && (
+                  {imagePreviews.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {imagePreviews.map((url) => (
+                        <div key={url} className="relative inline-block">
+                          <img
+                            src={url}
+                            alt="Preview"
+                            className="w-32 h-32 object-cover rounded-lg border"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/placeholder.svg';
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(url)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
                     <div className="relative inline-block">
                       <img
-                        src={imagePreview || formData.image}
+                        src="/placeholder.svg"
                         alt="Preview"
                         className="w-32 h-32 object-cover rounded-lg border"
                       />
-                      <button
-                        type="button"
-                        onClick={handleRemoveImage}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
                     </div>
                   )}
                   

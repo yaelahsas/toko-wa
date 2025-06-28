@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       price,
       original_price,
       description,
-      image,
+      images, // changed from image to images array
       category_id,
       stock,
       min_stock,
@@ -98,7 +98,26 @@ export async function POST(request: NextRequest) {
       ]
     );
 
-    return NextResponse.json(result.rows[0], { status: 201 });
+    const product = result.rows[0];
+
+    // Insert images into product_images table if images array is provided
+    if (Array.isArray(images) && images.length > 0) {
+      const insertImagePromises = images.map((img: { url: string; is_primary: boolean; display_order?: number }) => {
+        return query(
+          `INSERT INTO product_images (product_id, image_url, is_primary, display_order)
+           VALUES ($1, $2, $3, $4)`,
+          [
+            product.id,
+            img.url,
+            img.is_primary,
+            img.display_order || 0
+          ]
+        );
+      });
+      await Promise.all(insertImagePromises);
+    }
+
+    return NextResponse.json(product, { status: 201 });
   } catch (error) {
     console.error('Error creating product:', error);
     return NextResponse.json(

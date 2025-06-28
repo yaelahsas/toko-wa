@@ -22,11 +22,23 @@ async function getInitialData() {
 export default async function Page() {
   const { products, categories } = await getInitialData();
   const { storeInfo, voucherInfo, messages } = storeConfig;
+
+  // Parse images property if it's a string
+  const parsedProducts = products.map(product => {
+    if (typeof product.images === 'string') {
+      try {
+        return { ...product, images: JSON.parse(product.images) };
+      } catch {
+        return { ...product, images: [] };
+      }
+    }
+    return product;
+  });
   
   return (
     <Suspense fallback={<LoadingScreen />}>
       <VoucherStore 
-        initialProducts={products}
+        initialProducts={parsedProducts}
         categories={categories}
         storeInfo={storeInfo}
         voucherInfo={voucherInfo}
