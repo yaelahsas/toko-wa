@@ -43,6 +43,11 @@ const menuItems = [
     href: '/admin/orders',
     icon: ShoppingCart,
   },
+  {
+    title: 'Pelanggan',
+    href: '/admin/customers',
+    icon: User,
+  },
 ];
 
 

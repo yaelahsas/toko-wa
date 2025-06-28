@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, transaction } from '@/lib/db/connection'
+import { updateCustomerOrderCount } from '@/lib/db/queries/customers'
 
 interface CreateOrderRequest {
   customer_name: string
@@ -110,15 +111,36 @@ export async function POST(request: NextRequest) {
 
       const totalAmount = subtotal - discountAmount
 
-      // Create order
+    // Check if customer exists or create new one
+      let customerId;
+      const existingCustomerResult = await client.query(
+        'SELECT id FROM customers WHERE phone_number = $1',
+        [body.customer_phone]
+      );
+
+      if (existingCustomerResult.rows.length > 0) {
+        customerId = existingCustomerResult.rows[0].id;
+      } else {
+        const newCustomerResult = await client.query(
+          `INSERT INTO customers (
+            phone_number, order_count, last_order_date, created_at, updated_at
+          ) VALUES ($1, 0, NOW(), NOW(), NOW())
+          RETURNING id`,
+          [body.customer_phone]
+        );
+        customerId = newCustomerResult.rows[0].id;
+      }
+
+      // Create order with customer_id
       const orderResult = await client.query(
         `INSERT INTO orders (
-          order_number, customer_name, customer_email, customer_phone,
+          order_number, customer_id, customer_name, customer_email, customer_phone,
           status, subtotal, discount_amount, total_amount, promo_code
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *`,
         [
           orderNumber,
+          customerId,
           body.customer_name,
           body.customer_email,
           body.customer_phone,
@@ -131,6 +153,16 @@ export async function POST(request: NextRequest) {
       )
 
       const order = orderResult.rows[0]
+
+      // Update customer stats
+      await client.query(
+        `UPDATE customers 
+         SET order_count = order_count + 1,
+             last_order_date = NOW(),
+             updated_at = NOW()
+         WHERE id = $1`,
+        [customerId]
+      )
 
       // Create order items
       for (const item of orderItems) {
