@@ -59,12 +59,56 @@ export default function VoucherStore({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [products] = useState(initialProducts);
+  const [products, setProducts] = useState(initialProducts);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
 
   const router = useRouter();
   const { wishlist, toggleWishlist, isInWishlist } = useWishlist();
 
   const minPurchase = storeInfo.minPurchase;
+  // Function to fetch more products
+  const fetchMoreProducts = async () => {
+    if (loading || !hasMore) return;
+    
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('page', (page + 1).toString());
+      params.append('limit', '12');
+      if (selectedCategory !== 'all') {
+        const categoryObj = categories.find(c => c.id.toString() === selectedCategory);
+        if (categoryObj) {
+          params.append('category', categoryObj.slug);
+        }
+      }
+      if (searchQuery.trim()) {
+        params.append('search', searchQuery.trim());
+      }
+      const response = await fetch(`/api/products/paginated?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.products.length > 0) {
+          setProducts(prev => [...prev, ...data.products]);
+          setPage(prev => prev + 1);
+          if (data.products.length < 12) {
+            setHasMore(false);
+          }
+        } else {
+          setHasMore(false);
+        }
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error fetching more products:', error);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const totalItems = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
   const totalPrice = Object.entries(cart).reduce((sum, [id, qty]) => {
     const product = products.find((p) => p.id.toString() === id);
@@ -210,6 +254,20 @@ export default function VoucherStore({
   const clearSearch = () => {
     setSearchQuery('');
   };
+
+  // Infinite scroll effect
+  useEffect(() => {
+    const handleScroll = () => {
+      if (loading || !hasMore) return;
+      const scrollPosition = window.innerHeight + window.scrollY;
+      const threshold = document.body.offsetHeight - 300;
+      if (scrollPosition >= threshold) {
+        fetchMoreProducts();
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [loading, hasMore, page, selectedCategory, searchQuery, fetchMoreProducts]);
 
   // Don't render until cart is loaded from localStorage
   if (!isLoaded) {
@@ -430,7 +488,7 @@ export default function VoucherStore({
 
               return (
                 <Card
-                  key={product.id}
+                  key={`${product.id}-${filteredProducts.indexOf(product)}`}
                   className="bg-white rounded-xl overflow-hidden shadow-lg"
                 >
                   <div className="relative">

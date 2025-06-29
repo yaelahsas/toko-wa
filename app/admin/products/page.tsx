@@ -12,6 +12,8 @@ import {
   Trash2,
   AlertCircle,
   Package,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -27,22 +29,60 @@ interface Product {
   is_active: boolean;
 }
 
+interface PaginationData {
+  limit: number;
+  offset: number;
+  total: number;
+  hasMore: boolean;
+}
+
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteLoading, setDeleteLoading] = useState<number | null>(null);
+  const [pagination, setPagination] = useState<PaginationData>({
+    limit: 20,
+    offset: 0,
+    total: 0,
+    hasMore: false
+  });
 
+  // Debounced search
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    const timer = setTimeout(() => {
+      fetchProducts(0, searchQuery);
+    }, 300);
 
-  const fetchProducts = async () => {
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Initial load and pagination
+  useEffect(() => {
+    fetchProducts(pagination.offset, searchQuery);
+  }, [pagination.offset]);
+
+  const fetchProducts = async (offset: number, search?: string) => {
+    setLoading(true);
     try {
-      const response = await fetch('/api/products');
+      const params = new URLSearchParams({
+        limit: pagination.limit.toString(),
+        offset: offset.toString()
+      });
+      
+      if (search) {
+        params.append('search', search);
+      }
+
+      const response = await fetch(`/api/products?${params}`);
       if (response.ok) {
         const data = await response.json();
         setProducts(data.data || []);
+        setPagination(prev => ({
+          ...prev,
+          ...data.pagination,
+          offset
+        }));
       }
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -63,7 +103,8 @@ export default function AdminProductsPage() {
       });
 
       if (response.ok) {
-        setProducts(products.filter(p => p.id !== productId));
+        // Refresh current page
+        fetchProducts(pagination.offset, searchQuery);
       } else {
         alert('Gagal menghapus produk');
       }
@@ -92,12 +133,28 @@ export default function AdminProductsPage() {
     return { label: 'Tersedia', variant: 'default' as const };
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.category_name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleNextPage = () => {
+    if (pagination.hasMore) {
+      setPagination(prev => ({
+        ...prev,
+        offset: prev.offset + prev.limit
+      }));
+    }
+  };
 
-  if (loading) {
+  const handlePrevPage = () => {
+    if (pagination.offset > 0) {
+      setPagination(prev => ({
+        ...prev,
+        offset: Math.max(0, prev.offset - prev.limit)
+      }));
+    }
+  };
+
+  const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
+  const totalPages = Math.ceil(pagination.total / pagination.limit);
+
+  if (loading && products.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -143,91 +200,121 @@ export default function AdminProductsPage() {
       {/* Products Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Daftar Produk ({filteredProducts.length})</CardTitle>
+          <CardTitle>Daftar Produk ({pagination.total})</CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredProducts.length === 0 ? (
+          {products.length === 0 ? (
             <div className="text-center py-8">
               <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600">Tidak ada produk ditemukan</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-4">Produk</th>
-                    <th className="text-left p-4">Kategori</th>
-                    <th className="text-left p-4">Harga</th>
-                    <th className="text-left p-4">Stok</th>
-                    <th className="text-left p-4">Status</th>
-                    <th className="text-left p-4">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts.map((product) => {
-                    const stockStatus = getStockStatus(product.stock, product.min_stock);
-                    return (
-                      <tr key={product.id} className="border-b hover:bg-gray-50">
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={product.image || '/placeholder.svg'}
-                              alt={product.name}
-                              className="w-12 h-12 rounded-lg object-cover"
-                            />
-                            <div>
-                              <p className="font-medium">{product.name}</p>
-                              <p className="text-sm text-gray-600">{product.type}</p>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-4">Produk</th>
+                      <th className="text-left p-4">Kategori</th>
+                      <th className="text-left p-4">Harga</th>
+                      <th className="text-left p-4">Stok</th>
+                      <th className="text-left p-4">Status</th>
+                      <th className="text-left p-4">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((product) => {
+                      const stockStatus = getStockStatus(product.stock, product.min_stock);
+                      return (
+                        <tr key={product.id} className="border-b hover:bg-gray-50">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={product.image || '/placeholder.svg'}
+                                alt={product.name}
+                                className="w-12 h-12 rounded-lg object-cover"
+                              />
+                              <div>
+                                <p className="font-medium">{product.name}</p>
+                                <p className="text-sm text-gray-600">{product.type}</p>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <span className="text-sm">{product.category_name || '-'}</span>
-                        </td>
-                        <td className="p-4">
-                          <span className="font-medium">{formatPrice(product.price)}</span>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <span>{product.stock}</span>
-                            {product.stock <= product.min_stock && (
-                              <AlertCircle className="w-4 h-4 text-amber-500" />
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <Badge variant={stockStatus.variant}>
-                            {stockStatus.label}
-                          </Badge>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <Link href={`/admin/products/${product.id}/edit`}>
-                              <Button variant="outline" size="sm">
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                            </Link>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDelete(product.id)}
-                              disabled={deleteLoading === product.id}
-                            >
-                              {deleteLoading === product.id ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600" />
-                              ) : (
-                                <Trash2 className="w-4 h-4 text-red-600" />
+                          </td>
+                          <td className="p-4">
+                            <span className="text-sm">{product.category_name || '-'}</span>
+                          </td>
+                          <td className="p-4">
+                            <span className="font-medium">{formatPrice(product.price)}</span>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <span>{product.stock}</span>
+                              {product.stock <= product.min_stock && (
+                                <AlertCircle className="w-4 h-4 text-amber-500" />
                               )}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <Badge variant={stockStatus.variant}>
+                              {stockStatus.label}
+                            </Badge>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <Link href={`/admin/products/${product.id}/edit`}>
+                                <Button variant="outline" size="sm">
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              </Link>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDelete(product.id)}
+                                disabled={deleteLoading === product.id}
+                              >
+                                {deleteLoading === product.id ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                )}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="flex items-center justify-between mt-4 px-4">
+                <p className="text-sm text-gray-600">
+                  Showing {pagination.offset + 1} to {Math.min(pagination.offset + products.length, pagination.total)} of {pagination.total} products
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePrevPage}
+                    disabled={pagination.offset === 0 || loading}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <span className="text-sm">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNextPage}
+                    disabled={!pagination.hasMore || loading}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
