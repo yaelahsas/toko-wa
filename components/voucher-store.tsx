@@ -155,8 +155,7 @@ export default function VoucherStore({
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (product) =>
-          (product.name && product.name.toLowerCase().includes(query)) ||
-          (product.description && product.description.toLowerCase().includes(query))
+          product.name && product.name.toLowerCase().includes(query)
       );
     }
 
