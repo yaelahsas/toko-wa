@@ -68,14 +68,13 @@ export default function VoucherStore({
   const { wishlist, toggleWishlist, isInWishlist } = useWishlist();
 
   const minPurchase = storeInfo.minPurchase;
-  // Function to fetch more products
-  const fetchMoreProducts = async () => {
-    if (loading || !hasMore) return;
-    
+
+  // Fetch products from backend with current filters and pagination
+  const fetchProducts = async (pageNumber: number, append = false) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      params.append('page', (page + 1).toString());
+      params.append('page', pageNumber.toString());
       params.append('limit', '12');
       if (selectedCategory !== 'all') {
         const categoryObj = categories.find(c => c.id.toString() === selectedCategory);
@@ -90,23 +89,34 @@ export default function VoucherStore({
       if (response.ok) {
         const data = await response.json();
         if (data.products.length > 0) {
-          setProducts(prev => [...prev, ...data.products]);
-          setPage(prev => prev + 1);
-          if (data.products.length < 12) {
-            setHasMore(false);
+          if (append) {
+            setProducts(prev => [...prev, ...data.products]);
+          } else {
+            setProducts(data.products);
           }
+          setPage(pageNumber);
+          setHasMore(data.products.length === 12);
         } else {
+          if (!append) {
+            setProducts([]);
+          }
           setHasMore(false);
         }
       } else {
         setHasMore(false);
       }
     } catch (error) {
-      console.error('Error fetching more products:', error);
+      console.error('Error fetching products:', error);
       setHasMore(false);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Fetch more products for infinite scroll
+  const fetchMoreProducts = () => {
+    if (loading || !hasMore) return;
+    fetchProducts(page + 1, true);
   };
 
   const totalItems = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
@@ -139,7 +149,7 @@ export default function VoucherStore({
     }
   }, [cart, isLoaded]);
 
-  // Filter products based on search query and category
+  // Filter products based on selected category only (search handled by backend)
   const filteredProducts = useMemo(() => {
     let filtered = products;
 
@@ -150,17 +160,8 @@ export default function VoucherStore({
       );
     }
 
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (product) =>
-          product.name && product.name.toLowerCase().includes(query)
-      );
-    }
-
     return filtered;
-  }, [products, searchQuery, selectedCategory]);
+  }, [products, selectedCategory]);
 
   const addToCart = (productId: string) => {
     const product = products.find((p) => p.id.toString() === productId);
@@ -253,6 +254,25 @@ export default function VoucherStore({
   const clearSearch = () => {
     setSearchQuery('');
   };
+
+  // Debounce helper
+  function debounce(func: () => void, wait: number) {
+    let timeout: NodeJS.Timeout;
+    return () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        func();
+      }, wait);
+    };
+  }
+
+  // Fetch products on searchQuery or selectedCategory change with debounce
+  useEffect(() => {
+    const debouncedFetch = debounce(() => {
+      fetchProducts(1, false);
+    }, 500);
+    debouncedFetch();
+  }, [searchQuery, selectedCategory]);
 
   // Infinite scroll effect
   useEffect(() => {
